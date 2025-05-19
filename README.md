@@ -1,6 +1,6 @@
 ## Project for Fine-tuning Bert for Ciphers Recognition
 
-The learning goal is to practice fine-tuning a pretrained LM, in this scenario Bert, for a text recognition task, using task-specific dataset, [CipherBank]([https://huggingface.co/datasets/tau/commonsense_qa](https://huggingface.co/datasets/yu0226/CipherBank/viewer/Atbash?views%5B%5D=atbash)). The performance of the model in evaluated on test split of the dataset over training to monitor whether the model's performance is improving and compare the performance of the base pretrained model and the fine-tuned model.
+The learning goal is to practice fine-tuning a pretrained LM, in this scenario Bert, for a text recognition task, using task-specific dataset, [CipherBank](https://huggingface.co/datasets/yu0226/CipherBank/viewer/Atbash?views%5B%5D=atbash). The performance of the model in evaluated on test split of the dataset over training to monitor whether the model's performance is improving and compare the performance of the base pretrained model and the fine-tuned model.
 The following steps are performed:
 
 1. Preparing data and a custom Dataset
@@ -8,3 +8,27 @@ The following steps are performed:
 3. Setting up training pipeline
 4. Running the training, while tracking the losses
 5. Output analysis
+
+# TODO
+
+Future developments
+
+## Section
+
+Roadmap
+
+- [ ] Code Comments
+  - [ ] docstrings for functions
+  - [ ] inline comments
+  - [ ] README
+- [ ] Data Analysis
+- [ ] Evaluation
+  - [ ] sklearn.metrics evaluations (accuracy, precision, recall, F1)
+  - [ ] plots
+- [ ] Improvements
+  - [ ] configurable hyperparameters
+- [ ] CLI tool
+
+# BACKLOG
+
+- [ ] Decoder
