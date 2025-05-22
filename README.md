@@ -18,8 +18,8 @@ Future developments
 Roadmap
 
 - [ ] Code Comments
-  - [ ] docstrings for functions
-  - [ ] inline comments
+  - [X ] docstrings for functions
+  - [X ] inline comments
   - [ ] README
 - [ ] Data Analysis
 - [ ] Evaluation
