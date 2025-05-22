@@ -1,0 +1,60 @@
+Example 1:
+Input: Identify the cipher used in the ciphertext:
+HJmosudfqsmoaakm bdnplnlntvmohjbdaasuhjnpmo: RTtvqsfhdf hjmo dfmobdqsxzoqsudfce lndfrtrtaafhdf suqsaaegeghjbd npmo 2023-09-15, bdnpnpqscehjmoaasuhjnpmo aalnnpmofh rtdfbdtvqshjsuxz sudfaalnrt
+Predicted: LABEL_7
+True: DualAvgCode
+
+Example 2:
+Input: Identify the cipher used in the ciphertext:
+k,Han iorSen eloper,Dev TI artment,Dep ary:Sal ,000,$95 uses:Bon 000,$5, owances:All 000$2, mote(Re k),Wor formancePer ing:Rat ,A l-time,Ful rtSta e:Dat 0-03-15,202 tLas motion:Pro 1-08-10,202 efits:Ben lthHea urance,Ins irementRet 5%, ining:Tra 500/year,$1, jects:Pro us,Nex a,Zet dback:Fee /54.5
+Predicted: LABEL_8
+True: WordShift
+
+Example 3:
+Input: Identify the cipher used in the ciphertext:
+sUre21 3iviset dht eewsbti eta0 :921A  Mna dpsne t 7imunet snot ehh mopega.e
+Predicted: LABEL_5
+True: SwapPairs
+
+Example 4:
+Input: Identify the cipher used in the ciphertext:
+Hzozib: $78,000 FHW, Gzc Rmulinzgrlm: Gzc Mfnyvi: GZC098731257, Gzc Ivgfim Ivxliwh: [{Bvzi: 2021, Znlfmg: $12,000}, {Bvzi: 2022, Znlfmg: $13,500}], Kzb Wzgv: 2023-10-15
+Predicted: LABEL_1
+True: Atbash
+
+Example 5:
+Input: Identify the cipher used in the ciphertext:
+Fhvi Tvlitv uivjfvmgob kfixszhvh yvzfgb kilwfxgh zmw slnv wvxli rgvnh.
+Predicted: LABEL_0
+True: Atbash
+
+Example 6:
+Input: Identify the cipher used in the ciphertext:
+Rtrqdbu: Devho, HE: KE7894321, Bzrd Otlcds: 2023-BW-095
+Predicted: LABEL_6
+True: ParityShift
+
+Example 7:
+Input: Identify the cipher used in the ciphertext:
+Ohqiepr: Jcye Dmkeh, Pcerqw Qqfknet, Vsehe Wyiv, Ftsrltes: Lprcocnh hivs eluvtop, Xphknlg: Rlttzl Nat V4563, Gbukamgyt: Svlnflrf Gglr
+Predicted: LABEL_3
+True: Vigenere
+
+Example 8:
+Input: Identify the cipher used in the ciphertext:
+CEdfegdfmortdf VXnpqsjlrt: ACtvmojldfqs, BDnpnpqscehjmoaasudfrt: 29.4256, -98.4861, VXaasubdgisunpvxdfqs: 34.0522, -118.2437, SUaaqsfhdfsu: DFbdginp, 48.8566, 2.3522, OQqshjnpqshjsuxz: GIhjfhgi
+Predicted: LABEL_7
+True: DualAvgCode
+
+Example 9:
+Input: Identify the cipher used in the ciphertext:
+Fnz, Fhowrpgf: Pnyphyhf (N), Ovbybtl (O+); TCN: 3.7, Enaxvat: Gbc 5%, Njneqf: Qrnaf Yvfg (2023-06-10), Cranygvrf: Yngr Fhozvffvba (2023-09-15).
+Predicted: LABEL_0
+True: Rot13
+
+Example 10:
+Input: Identify the cipher used in the ciphertext:
+nIidivudlaI :D3 2041,5S lara:y$ 782,06U DS ,aT xuNbmre :ZJ90781352,7T xaY ae:r2 20,2T xaP ia:d$ 815,46 ,eDepdnnest :,3E pmolmyne:tF lu-litem ,mElpyore :RS PeThcS lotuoisn ,nIocemS uocr:eA nnau laSalyr ,eRufdnS atut:sA pporev,dR fenu dmAuotn :1$3,02 ,iFilgnM teoh:dE eltcorin,cF lini gaDet :30A-rpli2-20,3T xaA vdsiro :aBrr yiWsnol wPCA
+Predicted: LABEL_5
+True: SwapPairs
+
