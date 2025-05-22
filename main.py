@@ -8,45 +8,37 @@ from torch.utils.data import Dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import os
 
 
-""" 
-Data prepping:
-acquiring data, exploring dataset, cleaning / wrangling data, splitting data into training and validation set, tokenizing data
-"""
 ciphers = ['Rot13', 'Atbash', 'Polybius', 'Vigenere', 'Reverse', 'SwapPairs', 'ParityShift', 'DualAvgCode', 'WordShift']
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Download dataset from HF. As there are mupltiple subsets, combine them into one for training
-datasets = []
-for cipher in ciphers:
-    ds = load_dataset("yu0226/CipherBank", cipher, split="test")
-    ds = ds.map(lambda x: {'cipher_type': cipher})
-    datasets.append(ds)
+def prepare_dataset():
+    """
+    Download dataset from HF. As there are mupltiple subsets, combine them into one for training
+    """
+    datasets = []
+    for cipher in ciphers:
+        ds = load_dataset("yu0226/CipherBank", cipher, split="test")
+        ds = ds.map(lambda x: {'cipher_type': cipher})
+        datasets.append(ds)
 
-dataset = concatenate_datasets(datasets)
+    dataset = concatenate_datasets(datasets)
 
-#splitting dataset
-dataset = dataset.shuffle(seed=12)
-split_dataset = dataset.train_test_split(test_size=0.2)
+    #splitting dataset
+    dataset = dataset.shuffle(seed=12)
+    split_dataset = dataset.train_test_split(test_size=0.2)
 
-dataset = DatasetDict({
-    "train": split_dataset["train"],
-    "test": split_dataset["test"]
-})
+    dataset = DatasetDict({
+        "train": split_dataset["train"],
+        "test": split_dataset["test"]
+    })
 
-#print(dataset.keys())
-print("\n")
-# print a sample from the dataset
-print("Train sample: ", dataset["train"][:3])
-print("\n")
-print("Test sample: ", dataset["test"][:3])
-
-#load tokenizer
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    return dataset
 
 
-def massage_input_text(example):
+def massage_datasets(example):
     """
     Helper function for converting inputs into single string
     :param example: Sample input from the dataset
@@ -67,12 +59,6 @@ def add_label(example):
     """
     return {"labels": ciphers.index(example["cipher_type"])}
 
-# process input of train and validation sets
-massaged_datasets = dataset.map(massage_input_text)
-massaged_datasets = massaged_datasets.map(add_label)
-
-# massaged_datasets["train"][0]
-
 def tokenize(tokenizer, example):
     """
     Helper for pre-tokenizing all examples.
@@ -87,181 +73,180 @@ def tokenize(tokenizer, example):
     )
     return tokenized
 
-tokenized_dataset = massaged_datasets.map(
-    lambda example: tokenize(tokenizer, example),
-    batched=True,
-    remove_columns= ["domain", "sub_domain", "plaintext", 'cipher_type', 'Rot13', 'Atbash', 'Polybius', 'Vigenere', 'Reverse', 'SwapPairs', 'ParityShift', 'DualAvgCode', 'WordShift']
-)
+def process_dataset(dataset, tokenizer):
+    dataset = dataset.map(massage_datasets)
+    dataset = dataset.map(add_label)
 
-# move to accelerated device if available
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    print(f"Device: {device}")
-else:
-    device = torch.device("cpu")
-    print(f"Device: {device}")
+    dataset = dataset.map(
+        lambda example: tokenize(tokenizer, example),
+        batched=True,
+        remove_columns=["domain", "sub_domain", "plaintext", "cipher_type"] + ciphers
+    )
+    return dataset
 
-# load pretrained BERT model
-model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=9).to(device)
 
-# instantiate tokenized train dataset
-train_dataset = tokenized_dataset["train"]
-# instantiate tokenized validation dataset
-validation_dataset = tokenized_dataset["test"]
+def load_model():
+    """
+    load pretrained BERT model
+    """
+    model = BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=9)
+    return model.to(device)
 
-# instantiate a data collator
-collate_fn = default_data_collator
 
-# create a DataLoader for the dataset to automatically batch the data
-# and iteratively return training examples in batches
-dataloader = DataLoader(
-    train_dataset,
-    batch_size=16,
-    shuffle=True,
-    collate_fn=collate_fn,
-)
+def train(model, train_loader, val_loader, train_steps, epochs=5, val_steps=150):
+    # define optimizer and learning rate
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.01)
+    # define for losses accumulation
+    losses = []
+    validation_losses = []
 
-# create a DataLoader for the test dataset
-# reason for separate data loader is
-# different index for retreiving the test batches and different batch size
-validation_dataloader = DataLoader(
-    validation_dataset,
-    batch_size=16,
-    shuffle=True,
-    collate_fn=collate_fn
-)
+    # get a batch of data
+    dataloader_iter = iter(train_loader)
+    # put the model in training mode
+    model.train()
 
-# put the model in training mode
-model.train()
+    # iterate over epochs
+    for e in range(epochs):
+        # iterate over training steps
+        for i in tqdm(range(len(train_loader))):
+          try:
+              x = next(dataloader_iter)
+          except StopIteration:
+              dataloader_iter = iter(train_loader)
+              x = next(dataloader_iter)
 
-model = model.to(device)
+          # move the data to the device
+          x = {k: v.to(device) for k, v in x.items()}
 
-# training configutations
-epochs = 5
-train_steps = len(dataloader)
-print("Number of training steps: ", train_steps)
-num_test_steps = 150
-# define optimizer and learning rate
-optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-4, weight_decay=0.01)
-# define for losses accumulation
-losses = []
-validation_losses = []
+          # forward pass through the model
+          outputs = model(**x)
+          # get the loss
+          loss = outputs.loss
+          # backward pass
+          loss.backward()
+          # update the parameters of the model
+          losses.append(loss.item())
+          optimizer.step()
+          # zero out gradient for next step
+          optimizer.zero_grad()
 
-# get a batch of data
-dataloader_iter = iter(dataloader)
+          # evaluate on a few steps of validation set
+          if i % 10 == 0:
+              print(f"Epoch {e}, step {i}, loss {loss.item()}")
+              val_loss = 0
+              val_iter = iter(val_loader)
+              for j in range(val_steps):
+                try:
+                  x_test = next(val_iter)
+                except StopIteration:
+                  val_iter = iter(val_loader)
+                  x_test = next(val_iter)
 
-# iterate over epochs
-for e in range(epochs):
-    # iterate over training steps
-    for i in tqdm(range(train_steps)):
-        x = next(dataloader_iter)
-        # move the data to the device
-        x = {k: v.to(device) for k, v in x.items()}
-
-        # forward pass through the model
-        outputs = model(**x)
-        # get the loss
-        loss = outputs.loss
-        # backward pass
-        loss.backward()
-        # update the parameters of the model
-        losses.append(loss.item())
-        optimizer.step()
-        # zero out gradient for next step
-        optimizer.zero_grad()
-
-        # evaluate on a few steps of validation set
-        if i % 10 == 0:
-            print(f"Epoch {e}, step {i}, loss {loss.item()}")
-            val_loss = 0
-            for j in range(num_test_steps):
-                x_test = next(iter(validation_dataloader))
                 x_test = {k: v.to(device) for k, v in x_test.items()}
                 with torch.no_grad():
                     test_outputs = model(**x_test)
                 val_loss += test_outputs.loss.item()
-            validation_losses.append(val_loss / num_test_steps)
-            print("Test loss: ", val_loss / num_test_steps)
+              validation_losses.append(val_loss / val_steps)
+              print("Test loss: ", val_loss / val_steps)
 
-# plot training losses on x axis
-plt.plot(losses, label="Training Loss")
-plt.plot(
-    [i * 10 for i in range(len(validation_losses))],
-    label="Validation Loss"
+    return losses, validation_losses
+
+
+def plot_losses(train_losses, val_losses, path="outputs/loss_plot.png"):
+    plt.plot(train_losses, label="Training Loss")
+    plt.plot([i * 10 for i in range(len(val_losses))], val_losses, label="Validation Loss")
+    plt.xlabel("Training Steps")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
+    plt.legend()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    plt.savefig(path)
+    plt.show()
+
+def construct_test_samples(dataset):
+    samples = []
+    for i in range(10):
+        example = dataset["test"][i]
+        cipher_type = example["cipher_type"]
+        ciphertext = example[cipher_type]
+        input_text = f"Identify the cipher used in the ciphertext:\n{ciphertext}"
+        samples.append({"text": input_text, "label": cipher_type})
+    return samples
+
+def evaluate(model, tokenizer, samples):
+    predictions = []
+    model.eval()
+
+    for sample in samples:
+        inputs = sample["text"]
+        inputs = tokenizer(inputs, return_tensors="pt").to(device)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+
+        predicted_class_id = logits.argmax(dim=-1).item()
+        predicted_label = f"LABEL_{predicted_class_id}"
+
+        predictions.append((sample["text"], predicted_label, sample["label"]))
+
+    return predictions
+
+
+def main():
+    print("Device:", device)
+
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+    dataset = prepare_dataset()
+    tokenized_dataset = process_dataset(dataset, tokenizer)
+
+    model = load_model()
+
+    collate_fn = default_data_collator
+
+    train_dataset = tokenized_dataset["train"]
+    validation_dataset = tokenized_dataset["test"]
+
+    dataloader = DataLoader(
+        train_dataset,
+        batch_size=16,
+        shuffle=True,
+        collate_fn=collate_fn,
+    )
+
+    validation_dataloader = DataLoader(
+        validation_dataset,
+        batch_size=16,
+        shuffle=True,
+        collate_fn=collate_fn
+    )
+
+    train_steps = len(dataloader)
+
+    train_losses, val_losses = train(
+    model,
+    dataloader,
+    validation_dataloader,
+    len(dataloader),
+    5,
+    150
 )
-plt.xlabel("Training Steps")
-plt.ylabel("Loss")
-plt.legend()
-plt.title("Training and Validation Loss")
-plt.show()
 
-plt.plot( losses, label="Loss train")
-plt.xlabel("Training steps")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
+    plot_losses(train_losses, val_losses)
 
-plt.plot( validation_losses, label="Loss train")
-plt.xlabel("Training steps")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
+    os.makedirs("saved_models", exist_ok=True)
+    model.save_pretrained("saved_models/bert-cipher-classifier")
+    tokenizer.save_pretrained("saved_models/bert-cipher-classifier")
 
+    test_samples = construct_test_samples(dataset)
+    predictions = evaluate(model, tokenizer, test_samples)
 
-# construct a list of questions without the ground truth label
-# and compare prediction of the model with the ground truth
-def construct_test_samples(example):
-    """
-    Helper for converting input examples into a single string for testing the model.
-    example: dict
-        Sample input from the dataset
-    input_text: str, str
-        Tuple: Formatted test text which contains the ciphertext and label
-    """
-    cipher_type = example["cipher_type"]
-    ciphertext = example[cipher_type]
+    os.makedirs("outputs", exist_ok=True)
+    with open("outputs/predictions.txt", "w") as f:
+        for i, (text, pred, true) in enumerate(predictions, 1):
+            f.write(f"Example {i}:\nInput: {text}\nPredicted: {pred}\nTrue: {true}\n\n")
 
-    input_text = f"Identify the cipher used in the ciphertext:\n{ciphertext}"
-
-    return {"text": input_text, "label": cipher_type}
-
-test_samples = [construct_test_samples(dataset["test"][i]) for i in range(10)]
-#test_samples
-
-label_map = {
-    "LABEL_0": "Rot13",
-    "LABEL_1": "Atbash",
-    "LABEL_2": "Polybius",
-    "LABEL_3": "Vigenere",
-    "LABEL_4": "Reverse",
-    "LABEL_5": "SwapPairs",
-    "LABEL_6": "ParityShift",
-    "LABEL_7": "DualAvgCode",
-    "LABEL_8": "WordShift",
-}
-# Test the model
-
-# set it to evaluation mode
-model.eval()
-
-predictions = []
-for sample in test_samples:
-    input_text = sample["text"]
-    inputs = tokenizer(input_text, return_tensors="pt").to(device)
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits
-
-    predicted_class_id = logits.argmax(dim=-1).item()
-    predicted_label = model.config.id2label[predicted_class_id]
-
-    predictions.append((input_text, predicted_label, sample["label"]))
-
-print("Predictions of trained model:")
-for i, (input_text, predicted_token, true_label) in enumerate(predictions, 1):
-    predicted_label = label_map.get(predicted_token, predicted_token)
-    print(f"Example {i}:")
-    print(f"Input:{input_text}")
-    print(f"Predicted Label: {predicted_label}")
-    print(f"True Label: {true_label}")
+if __name__ == "__main__":
+    main()
