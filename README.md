@@ -18,13 +18,13 @@ Future developments
 Roadmap
 
 - [ ] Code Comments
-  - [X ] docstrings for functions
-  - [X ] inline comments
+  - [X] docstrings for functions
+  - [X] inline comments
   - [ ] README
 - [ ] Data Analysis
 - [ ] Evaluation
   - [ ] sklearn.metrics evaluations (accuracy, precision, recall, F1)
-  - [ ] plots
+  - [X] plots
 - [ ] Improvements
   - [ ] configurable hyperparameters
 - [ ] CLI tool
